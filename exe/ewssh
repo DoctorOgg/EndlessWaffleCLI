@@ -1,0 +1,67 @@
+#!/usr/bin/env ruby
+
+require "bundler/setup"
+require "EndlessWaffleCLI"
+
+if ENV['EndlessWaffleURL'].nil?
+  puts "EndlessWaffleCLI requires the 'EndlessWaffleURL' environment variable to be set."
+  exit 1
+else
+  EndlessWaffleCLI.setServer ENV['EndlessWaffleURL']
+end
+
+def showHelp
+  puts
+  puts "Endless Waffle SSH"
+  puts "Usage example: #{$0} name.enviroment"
+  puts "Usage example: #{$0} user@name.enviroment some_remote_command"
+  puts "Usage example: #{$0} api.prod1"
+  puts "Usage example: #{$0} ogg@api.prod1"
+  puts "Usage example: #{$0} ogg@api.prod1 uptime"
+  puts
+end
+
+if ARGV.length >= 1
+  a = ARGV[0].split('@')
+  if a.length > 1
+    username = a[0]
+    destention = a[1]
+  else
+    destention = a[0]
+    username = ENV['USER']
+  end
+  if ARGV.length > 1
+    remote_command = ARGV[1,ARGV.length].join(' ')
+  end
+
+  if !destention.include? '.'
+    showHelp
+    exit 1
+  end
+  destention_parts = destention.split('.')
+  if destention_parts.length > 2
+    showHelp
+    exit 1
+  end
+  node_name = destention_parts[0]
+  environment = destention_parts[1]
+else
+  showHelp
+  exit 1
+end
+
+
+query = {
+  :environment => environment,
+  :name => node_name
+}
+
+result = EndlessWaffleCLI.queryEc2 query
+
+ result.first["dnsName"]
+
+if remote_command.nil?
+  exec "ssh #{username}@#{result.first["dnsName"]}"
+else
+  exec "ssh #{username}@#{result.first["dnsName"]} #{remote_command}"
+end
