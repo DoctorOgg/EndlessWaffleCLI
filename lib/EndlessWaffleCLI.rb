@@ -3,20 +3,24 @@ require "EndlessWaffleCLI/version"
 module EndlessWaffleCLI
   require 'rest-client'
   require 'json'
-  Server=ENV['EndlessWaffleURL']
+  @@server=nil
 
-  def EndlessWaffleCLI.updateEc2Cache
+  def self.setServer(server)
+    @@server = server
+  end
+
+  def self.updateEc2Cache
     begin
-      result = RestClient.get "#{EndlessWaffleCLI::Server}/ec2/update", {:accept => :json}
+      result = RestClient.get "#{@@server}/ec2/update", {:accept => :json}
       JSON.parse(result.body)
     rescue => e
       raise e.response
     end
   end
 
-  def EndlessWaffleCLI.queryEc2(query={})
+  def self.queryEc2(query={})
     begin
-      result = RestClient.post "#{EndlessWaffleCLI::Server}/ec2", { :query => query }.to_json, :content_type => :json, :accept => :json
+      result = RestClient.post "#{@@server}/ec2", { :query => query }.to_json, :content_type => :json, :accept => :json
       JSON.parse(result.body)
     rescue => e
       raise e.response

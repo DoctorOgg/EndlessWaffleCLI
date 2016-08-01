@@ -32,9 +32,9 @@ Gem::Specification.new do |spec|
   spec.add_dependency "bundler", "~> 1.12"
   spec.add_dependency "rake", "~> 10.0"
   spec.add_dependency 'mime-types', '~> 3.1'
+  spec.add_dependency 'unf_ext', '~> 0.0.7.2'
   spec.add_dependency 'unf', '~> 0.1.4'
   spec.add_dependency 'rest-client', '~> 2.0'
   spec.add_dependency 'console_table', '~> 0.2.4'
   spec.add_dependency 'colorize', '~> 0.8.1'
-
 end

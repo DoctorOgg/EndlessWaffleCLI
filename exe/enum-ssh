@@ -1,0 +1,141 @@
+#!/usr/bin/env ruby
+
+require "bundler/setup"
+require "EndlessWaffleCLI"
+require 'json'
+require 'getoptlong'
+require 'console_table'
+require 'colorize'
+
+query = {}
+updateCache = false
+showList = false
+showJSON = false
+
+if ENV['EndlessWaffleURL'].nil?
+  puts "EndlessWaffleCLI requires the 'EndlessWaffleURL' environment variable to be set."
+  exit 1
+else
+  EndlessWaffleCLI.setServer ENV['EndlessWaffleURL']
+end
+
+
+def colorizeState(state)
+  if state == "running"
+    state.colorize(:green)
+  else
+    state.colorize(:red)
+  end
+end
+
+def showHelp
+  puts
+  puts "Endless Waffle Enumerate SSH"
+	puts "Usage example: #{$0} -e dev1 -r frontend -c 'uptime' "
+	puts
+	puts "Options:"
+	puts "-e or --environment".ljust(30)         +"-> Specifiy environment"
+	puts "-r or --role".ljust(30)                +"-> Specifiy role"
+  puts "-c or --command".ljust(30)             +"-> Specifiy command"
+  puts "-h or --help".ljust(30)                +"-> Show this help message."
+	puts
+end
+
+parser = GetoptLong.new
+parser.set_options(["-m", "--monochrome", GetoptLong::NO_ARGUMENT],
+                   ["-e", "--environment", GetoptLong::NO_ARGUMENT],
+                   ["-r", "--role", GetoptLong::NO_ARGUMENT],
+                   ["-l", "--list", GetoptLong::NO_ARGUMENT],
+                   ["-j", "--json", GetoptLong::NO_ARGUMENT],
+                   ["-i", "--instanceId", GetoptLong::NO_ARGUMENT],
+                   ["-n", "--name", GetoptLong::NO_ARGUMENT],
+                   ["-c", "--cache", GetoptLong::NO_ARGUMENT],
+                   ["-h", "--help", GetoptLong::NO_ARGUMENT]
+                   )
+
+begin
+	begin
+		opt,arg = parser.get_option
+		break if not opt
+		case opt
+			when "-h" || "--help"
+				showHelp
+				exit
+			when "-m" || "--monochrome"
+        String.disable_colorization = true
+			when "-e" || "--environment"
+				query.store(:environment,  ARGV[0])
+      when "-r" || "--role"
+        query.store(:role,  ARGV[0])
+      when "-l" || "--list"
+        showList = true
+      when "-j" || "--json"
+        showJSON = true
+      when "-i" || "--instanceId"
+        query.store(:instanceId,  ARGV[0])
+      when "-n" || "--name"
+        query.store(:name,  ARGV[0])
+			when "-c" || "--cache"
+				updateCache = true
+			end
+		rescue => err
+			puts "#{err.class()}: #{err.message}"
+			exit 1
+	end
+end while 1
+
+
+def showTable(result)
+  table_config = [
+     {:key=>:instanceId, :size=>13, :title=>"Instance Id"},
+     {:key=>:name, :size=>9, :title=>"Name"},
+     {:key=>:role, :size=>8, :title=>"Role"},
+     {:key=>:environment, :size=>8, :title=>"Env"},
+     {:key=>:instanceType, :size=>10, :title=>"Type"},
+     {:key=>:availabilityZone, :size=>12, :title=>"Zone"},
+     {:key=>:instanceState, :size=>12, :title=>"State"},
+     {:key=>:dnsName, :size=>"*", :title=>"DNS Name"},
+  ]
+  ConsoleTable.define(table_config) do |table|
+      result.each do |r|
+        table << [
+          r["instanceId"].colorize(:yellow),
+          r["nodemap"]["name"],
+          r["nodemap"]["role"],
+          r["nodemap"]["environment"],
+          r["instanceType"],
+          r["placement"]["availabilityZone"],
+          colorizeState(r["instanceState"]["name"]),
+          r["dnsName"]]
+      end
+  end
+end
+
+
+def showJSON(result)
+  puts JSON.pretty_generate(result)
+end
+
+def showList(result)
+  output = []
+  result.each do |i|
+    output.push i["dnsName"]
+  end
+  puts output.join(' ')
+end
+
+if updateCache == true
+  puts "Running Cache Update:"
+  puts EndlessWaffleCLI.updateEc2Cache
+end
+
+result = EndlessWaffleCLI.queryEc2 query
+
+
+if showList == false && showJSON == false
+  showTable result
+elsif showJSON == true
+  showJSON result
+elsif showList == true
+  showList result
+end

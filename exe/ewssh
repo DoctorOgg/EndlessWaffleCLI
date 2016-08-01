@@ -58,7 +58,10 @@ query = {
 
 result = EndlessWaffleCLI.queryEc2 query
 
- result.first["dnsName"]
+if result.length < 1
+  puts "No resutls found...."
+  exit 1
+end
 
 if remote_command.nil?
   exec "ssh #{username}@#{result.first["dnsName"]}"
