@@ -2,15 +2,13 @@
 
 require "bundler/setup"
 require "EndlessWaffleCLI"
-require 'json'
 require 'getoptlong'
-require 'console_table'
-require 'colorize'
+require 'net/ssh/multi'
 
 query = {}
-updateCache = false
-showList = false
-showJSON = false
+runCommand = nil
+username = ENV['USER']
+promptPassword=false
 
 if ENV['EndlessWaffleURL'].nil?
   puts "EndlessWaffleCLI requires the 'EndlessWaffleURL' environment variable to be set."
@@ -37,20 +35,19 @@ def showHelp
 	puts "-e or --environment".ljust(30)         +"-> Specifiy environment"
 	puts "-r or --role".ljust(30)                +"-> Specifiy role"
   puts "-c or --command".ljust(30)             +"-> Specifiy command"
+  puts "-u or --username".ljust(30)            +"-> Specifiy username"
+  puts "-p or --password".ljust(30)            +"-> Prompt for password"
+
   puts "-h or --help".ljust(30)                +"-> Show this help message."
 	puts
 end
 
 parser = GetoptLong.new
-parser.set_options(["-m", "--monochrome", GetoptLong::NO_ARGUMENT],
-                   ["-e", "--environment", GetoptLong::NO_ARGUMENT],
+parser.set_options(["-e", "--environment", GetoptLong::NO_ARGUMENT],
                    ["-r", "--role", GetoptLong::NO_ARGUMENT],
-                   ["-l", "--list", GetoptLong::NO_ARGUMENT],
-                   ["-j", "--json", GetoptLong::NO_ARGUMENT],
-                   ["-i", "--instanceId", GetoptLong::NO_ARGUMENT],
-                   ["-n", "--name", GetoptLong::NO_ARGUMENT],
-                   ["-c", "--cache", GetoptLong::NO_ARGUMENT],
-                   ["-h", "--help", GetoptLong::NO_ARGUMENT]
+                   ["-c", "--command", GetoptLong::NO_ARGUMENT],
+                   ["-h", "--help", GetoptLong::NO_ARGUMENT],
+                   ["-p", "--password", GetoptLong::NO_ARGUMENT]
                    )
 
 begin
@@ -61,22 +58,16 @@ begin
 			when "-h" || "--help"
 				showHelp
 				exit
-			when "-m" || "--monochrome"
-        String.disable_colorization = true
 			when "-e" || "--environment"
 				query.store(:environment,  ARGV[0])
       when "-r" || "--role"
         query.store(:role,  ARGV[0])
-      when "-l" || "--list"
-        showList = true
-      when "-j" || "--json"
-        showJSON = true
-      when "-i" || "--instanceId"
-        query.store(:instanceId,  ARGV[0])
-      when "-n" || "--name"
-        query.store(:name,  ARGV[0])
-			when "-c" || "--cache"
-				updateCache = true
+			when "-c" || "--command"
+				runCommand  = ARGV[0]
+      when "-u" || "--username"
+        username  = ARGV[0]
+      when "-p" || "--password"
+        promptPassword = true
 			end
 		rescue => err
 			puts "#{err.class()}: #{err.message}"
@@ -84,58 +75,45 @@ begin
 	end
 end while 1
 
-
-def showTable(result)
-  table_config = [
-     {:key=>:instanceId, :size=>13, :title=>"Instance Id"},
-     {:key=>:name, :size=>9, :title=>"Name"},
-     {:key=>:role, :size=>8, :title=>"Role"},
-     {:key=>:environment, :size=>8, :title=>"Env"},
-     {:key=>:instanceType, :size=>10, :title=>"Type"},
-     {:key=>:availabilityZone, :size=>12, :title=>"Zone"},
-     {:key=>:instanceState, :size=>12, :title=>"State"},
-     {:key=>:dnsName, :size=>"*", :title=>"DNS Name"},
-  ]
-  ConsoleTable.define(table_config) do |table|
-      result.each do |r|
-        table << [
-          r["instanceId"].colorize(:yellow),
-          r["nodemap"]["name"],
-          r["nodemap"]["role"],
-          r["nodemap"]["environment"],
-          r["instanceType"],
-          r["placement"]["availabilityZone"],
-          colorizeState(r["instanceState"]["name"]),
-          r["dnsName"]]
-      end
+def ssh_using_key(command,query,username)
+  Net::SSH::Multi.start(:on_error => :warn) do |session|
+    list = EndlessWaffleCLI.queryEc2 query
+    list.each do |machine|
+      session.use "#{username}@#{machine['dnsName']}"
+    end
+    session.exec command
   end
 end
 
-
-def showJSON(result)
-  puts JSON.pretty_generate(result)
-end
-
-def showList(result)
-  output = []
-  result.each do |i|
-    output.push i["dnsName"]
+def ssh_runthis(command,host,user,password)
+  Net::SSH.start(host, user, :password => password) do |ssh|
+    output = ssh.exec!(command)
+    puts "[#{host}] #{output}"
   end
-  puts output.join(' ')
 end
 
-if updateCache == true
-  puts "Running Cache Update:"
-  puts EndlessWaffleCLI.updateEc2Cache
+def ssh_using_password(command,query,username,password)
+  list = EndlessWaffleCLI.queryEc2 query
+  list.each do |machine|
+    ssh_runthis(command,machine['dnsName'],username,password)
+  end
 end
 
-result = EndlessWaffleCLI.queryEc2 query
+if query[:environment].nil?
+  puts "You need to sepecify a environment"
+  exit 1
+end
 
+if runCommand.nil?
+  puts "You need to sepecify a command to run"
+  exit 1
+end
 
-if showList == false && showJSON == false
-  showTable result
-elsif showJSON == true
-  showJSON result
-elsif showList == true
-  showList result
+if promptPassword
+  print "Password for #{username}: "
+  password=STDIN.noecho(&:gets).chomp
+  puts ""
+  ssh_using_password(runCommand,query,username,password)
+else
+  ssh_using_key(runCommand,query,username)
 end
