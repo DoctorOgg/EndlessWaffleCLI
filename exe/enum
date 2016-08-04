@@ -19,6 +19,12 @@ else
   EndlessWaffleCLI.setServer ENV['EndlessWaffleURL']
 end
 
+if ENV['EndlessWaffleToken'].nil?
+  puts "EndlessWaffleCLI requires the 'EndlessWaffleToken' environment variable to be set."
+  exit 1
+else
+  EndlessWaffleCLI.setToken ENV['EndlessWaffleToken']
+end
 
 def colorizeState(state)
   if state == "running"

@@ -17,6 +17,12 @@ else
   EndlessWaffleCLI.setServer ENV['EndlessWaffleURL']
 end
 
+if ENV['EndlessWaffleToken'].nil?
+  puts "EndlessWaffleCLI requires the 'EndlessWaffleToken' environment variable to be set."
+  exit 1
+else
+  EndlessWaffleCLI.setToken ENV['EndlessWaffleToken']
+end
 
 def colorizeState(state)
   if state == "running"
@@ -37,7 +43,6 @@ def showHelp
   puts "-c or --command".ljust(30)             +"-> Specifiy command"
   puts "-u or --username".ljust(30)            +"-> Specifiy username"
   puts "-p or --password".ljust(30)            +"-> Prompt for password"
-
   puts "-h or --help".ljust(30)                +"-> Show this help message."
 	puts
 end

@@ -38,5 +38,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'console_table', '~> 0.2.4'
   spec.add_dependency 'colorize', '~> 0.8.1'
   spec.add_dependency 'net-ssh-multi', '~> 1.2', '>= 1.2.1'
+  spec.add_dependency 'net-ssh-gateway', '~> 1.2'
+  spec.add_dependency 'net-ssh', '~> 3.2'
   spec.add_dependency 'highline', '~> 1.7', '>= 1.7.8'
 end

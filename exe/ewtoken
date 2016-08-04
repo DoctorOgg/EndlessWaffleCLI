@@ -1,0 +1,63 @@
+#!/usr/bin/env ruby
+require "bundler/setup"
+require "EndlessWaffleCLI"
+require 'getoptlong'
+username = ENV['USER']
+resetToken = false
+
+if ENV['EndlessWaffleURL'].nil?
+  puts "EndlessWaffleCLI requires the 'EndlessWaffleURL' environment variable to be set."
+  exit 1
+else
+  EndlessWaffleCLI.setServer ENV['EndlessWaffleURL']
+end
+
+def showHelp
+  puts
+  puts "Endless Waffle Token Tool"
+	puts "Usage example: #{$0} -u bob"
+	puts
+	puts "Options:"
+	puts "-r or --reset".ljust(30)                +"-> Reset your token"
+  puts "-u or --username".ljust(30)             +"-> Specifiy username"
+  puts "-h or --help".ljust(30)                 +"-> Show this help message."
+	puts
+end
+
+parser = GetoptLong.new
+parser.set_options( ["-u", "--username", GetoptLong::NO_ARGUMENT],
+                    ["-r", "--reset", GetoptLong::NO_ARGUMENT])
+
+begin
+	begin
+		opt,arg = parser.get_option
+		break if not opt
+		case opt
+			when "-h" || "--help"
+				showHelp
+				exit
+      when "-r" || "--reset"
+        resetToken = true
+      when "-u" || "--username"
+        username  = ARGV[0]
+			end
+		rescue => err
+			puts "#{err.class()}: #{err.message}"
+			exit 1
+	end
+end while 1
+
+
+
+print "Password for #{username}: "
+password=STDIN.noecho(&:gets).chomp
+puts ""
+
+if resetToken
+  result = EndlessWaffleCLI.resetToken(username,password)
+else
+  result = EndlessWaffleCLI.getToken(username,password)
+end
+puts "You're new token: #{result["token"]}"
+puts "Remember to set your environment EndlessWaffleToken with your new token"
+puts "export EndlessWaffleToken=\"#{result["token"]}\""
