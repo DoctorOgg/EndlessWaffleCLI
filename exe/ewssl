@@ -1,0 +1,210 @@
+#!/usr/bin/env ruby
+require 'rubygems'
+require 'getoptlong'
+require 'pp'
+require 'colorize'
+require 'json'
+require 'pty'
+require 'fileutils'
+require 'console_table'
+require 'openssl'
+
+
+
+@results_directory = "#{ENV["HOME"]}/.ewssl"
+@config_file = "#{ENV["HOME"]}/.ewssl.json"
+
+example_config = {
+  :snpp => {
+    :digest_algorithm => "sha256",
+    :key_size_bits => 4096,
+    :city => "Springfield",
+    :country => "US",
+    :organization => "Springfield Nuclear Power Plant",
+    :state => "Illinois"
+  }
+}
+def writeSampleConfig(path,data)
+  File.open(path,"w") do |f|
+    f.write(JSON.pretty_generate(data))
+  end
+end
+
+FileUtils.mkdir_p(@results_directory) if !File.directory? @results_directory
+writeSampleConfig(@config_file,example_config) if !File.exists? @config_file
+
+begin
+  @config = JSON.parse(File.read @config_file)
+rescue
+  puts "I'm So Sorry, I can't open or read or find your config file".colorize(:red)
+  exit 1
+end
+
+def display_help
+	puts
+  puts "This is a tool to generate SSL CSR's and KEYs "
+  puts "Config File: #{@config_file.colorize(:blue)}"
+  puts
+	puts "Options:"
+	puts "-h or --help ".ljust(30) 		  	+"-> Display this help message"
+	puts "-c or --config".ljust(30) 		  +"-> Specifiy Config to use"
+	puts "-f or --fqdn".ljust(30) 		    +"-> Domain name you want a CRT for"
+	puts "-l or --list".ljust(30)         + "-> List Valid Configs"
+	puts
+	exit 1
+end
+
+def parse_cli
+  if ARGV[0] == nil
+  	display_help
+  end
+
+  parser = GetoptLong.new
+  parser.set_options(["-h", "--help", GetoptLong::NO_ARGUMENT],
+                     ["-c", "--config", GetoptLong::NO_ARGUMENT],
+                     ["-f", "--fqdn", GetoptLong::NO_ARGUMENT],
+                     ["-l", "--list", GetoptLong::NO_ARGUMENT]
+                     )
+
+  begin
+    begin
+        opt,arg = parser.get_option
+        break if not opt
+        case opt
+           when "-h" || "--help"
+             display_help
+           exit
+           when "-c" || "--config"
+              @active_config = ARGV[0].strip().downcase()
+           when "-f" || "--fqdn"
+              @fqdn = ARGV[0].strip().downcase()
+            when "-l" || "--list"
+              @list = true
+  	    end
+    rescue => err
+       puts "#{err.class()}: #{err.message}"
+       puts "this should never happen, Did'nt i warn you?".red.blink
+  	   display_help
+       exit
+    end
+  end while 1
+
+end
+
+
+def list
+  puts "\nHint: Use the #{"Blue".colorize(:blue)} items and your config name"
+  table_config = [
+     {:key=>:shortname, :size=>7, :title=>"Config"},
+     {:key=>:organization, :size=>50, :title=>"Organization"},
+     {:key=>:digest_algorithm, :size=>10, :title=>"Algorithm"},
+     {:key=>:key_size_bits, :size=>10, :title=>"Key Size"}
+  ]
+  ConsoleTable.define(table_config) do |table|
+    @config.each do |item|
+      table << [
+        item[0].dup.colorize(:blue),
+        item[1]["organization"],
+        item[1]["digest_algorithm"].colorize(:yellow),
+        item[1]["key_size_bits"].to_s.colorize(:purple)
+      ]
+    end
+  end
+  puts
+  exit 0
+end
+
+
+def makeDirs
+  # root/org/fqdn
+  @my_path = "#{@results_directory}/#{@active_config}/#{@fqdn.gsub('*','star')}"
+  FileUtils.mkdir_p(@my_path) if !File.directory? @my_path
+  puts "Storing results in #{@my_path}"
+end
+
+def generateKey
+  @key = OpenSSL::PKey::RSA.new @sel_config["key_size_bits"]
+  @my_key_path = "#{@my_path}/#{@fqdn.gsub('*','star')}-#{@timestamp}.key"
+  open @my_key_path, 'w' do |io| io.write @key.to_pem end
+  puts "New key generated (bits: #{@sel_config["key_size_bits"]}): #{@my_key_path}"
+end
+
+def generateCSR
+  request = OpenSSL::X509::Request.new
+  request.version = 0
+  request.subject = OpenSSL::X509::Name.new([
+  ['C',             @sel_config["country"],      OpenSSL::ASN1::PRINTABLESTRING],
+  ['ST',            @sel_config["state"],        OpenSSL::ASN1::PRINTABLESTRING],
+  ['L',             @sel_config["city"],         OpenSSL::ASN1::PRINTABLESTRING],
+  ['O',             @sel_config["organization"], OpenSSL::ASN1::UTF8STRING],
+  ['CN',            @fqdn,                       OpenSSL::ASN1::UTF8STRING]
+  ])
+  request.public_key = @key.public_key
+  request.sign(@key, Kernel.const_get("OpenSSL::Digest::#{@sel_config["digest_algorithm"].upcase}").new)
+  @my_csr_path = "#{@my_path}/#{@fqdn.gsub('*','star')}-#{@timestamp}.csr"
+  puts "Storing CSR at: #{@my_csr_path}".colorize(:green)
+  File.open(@my_csr_path,"w") do |f|
+    f.write(request)
+  end
+  puts request
+end
+
+def storeSignedCert
+  puts "Please Paste the CERT in here (End with ^D):".colorize(:green)
+  @my_cert_path = "#{@my_path}/#{@fqdn.gsub('*','star')}-#{@timestamp}.pem"
+  @signed_cert = $stdin.read
+  if @signed_cert.length > 0
+    puts "Writing Cert to: #{@my_cert_path}"
+    File.open(@my_cert_path, 'w') {|f| f.write( @signed_cert ) }
+  else
+    puts "no data found, skippking"
+  end
+end
+
+def storeCertificateChain
+  puts "Please Paste the Certificate Chain in here (End with ^D):".colorize(:green)
+  @my_chain_path = "#{@my_path}/#{@fqdn.gsub('*','star')}-chain-#{@timestamp}.pem"
+  @chain = $stdin.read
+  if @chain.length > 0
+    puts "Writing Cert to: #{@my_chain_path}"
+    File.open(@my_chain_path, 'w') {|f| f.write( @chain ) }
+  else
+    puts "no data found, skippking"
+  end
+end
+
+def genDataBag
+  @my_databag_path = "#{@my_path}/#{@fqdn.gsub('*','star')}-chain-#{@timestamp}.json"
+  databag = {}
+  databag.store(:id, "ssl")
+  databag.store(:key, @key.to_pem)
+  databag.store(:cert, @signed_cert)
+  databag.store(:chain, @chain)
+  puts "Writing databag to: #{@my_databag_path}"
+  File.open(@my_databag_path,"w") do |f|
+    f.write(JSON.pretty_generate(databag))
+  end
+end
+
+
+parse_cli
+if @list == true
+  list
+else
+  if @fqdn.nil?
+    puts "You must specify a FQDN!"
+    exit 1
+  end
+  @sel_config = @config[@active_config]
+  @timestamp = Time.now.strftime("%m-%d-%Y")
+  if @sel_config == nil
+   puts "Help, I can't seem to find the config your asking for in #{@config_file}".colorize(:red)
+   exit 1
+  end
+  makeDirs
+  generateKey
+  generateCSR
+  storeSignedCert
+  storeCertificateChain
+  genDataBag
+end
