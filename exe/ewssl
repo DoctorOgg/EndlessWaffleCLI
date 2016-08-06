@@ -174,7 +174,7 @@ def storeCertificateChain
 end
 
 def genDataBag
-  @my_databag_path = "#{@my_path}/#{@fqdn.gsub('*','star')}-chain-#{@timestamp}.json"
+  @my_databag_path = "#{@my_path}/#{@fqdn.gsub('*','star')}-#{@timestamp}.json"
   databag = {}
   databag.store(:id, "ssl")
   databag.store(:key, @key.to_pem)

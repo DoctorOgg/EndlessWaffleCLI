@@ -99,7 +99,7 @@ end while 1
 def showTable(result)
   table_config = [
      {:key=>:instanceId, :size=>13, :title=>"Instance Id"},
-     {:key=>:name, :size=>9, :title=>"Name"},
+     {:key=>:name, :size=>13, :title=>"Name"},
      {:key=>:role, :size=>8, :title=>"Role"},
      {:key=>:environment, :size=>8, :title=>"Env"},
      {:key=>:instanceType, :size=>10, :title=>"Type"},

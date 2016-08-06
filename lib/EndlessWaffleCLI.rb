@@ -49,4 +49,40 @@ module EndlessWaffleCLI
     end
   end
 
+  def self.updateSubnets
+    begin
+      result = RestClient.get "#{@@server}/subnets/update", :accept => :json, :Authorization => "Token token=\"#{@@token}\""
+      JSON.parse(result.body)
+    rescue => e
+      raise e
+    end
+  end
+
+  def self.querySubnets(query={})
+    begin
+      result = RestClient.post "#{@@server}/subnets/show", { :query => query }.to_json, :content_type => :json, :accept => :json, :Authorization => "Token token=\"#{@@token}\""
+      JSON.parse(result.body)
+    rescue => e
+      raise e
+    end
+  end
+
+  def self.updateAmi
+    begin
+      result = RestClient.get "#{@@server}/ami/update", :accept => :json, :Authorization => "Token token=\"#{@@token}\""
+      JSON.parse(result.body)
+    rescue => e
+      raise e
+    end
+  end
+
+  def self.queryAmi(query={})
+    begin
+      result = RestClient.post "#{@@server}/ami/show", { :query => query }.to_json, :content_type => :json, :accept => :json, :Authorization => "Token token=\"#{@@token}\""
+      JSON.parse(result.body)
+    rescue => e
+      raise e
+    end
+  end
+
 end

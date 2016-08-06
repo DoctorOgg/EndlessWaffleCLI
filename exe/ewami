@@ -5,7 +5,6 @@ require "EndlessWaffleCLI"
 require 'json'
 require 'getoptlong'
 require 'console_table'
-require 'colorize'
 
 query = {}
 updateCache = false
@@ -25,24 +24,18 @@ else
   EndlessWaffleCLI.setToken ENV['EndlessWaffleToken']
 end
 
-def colorizeState(state)
-  if state > 0
-    state.to_s.colorize(:green)
-  else
-    state.to_s.colorize(:red)
-  end
-end
-
 def showHelp
   puts
-  puts "Endless Waffle Subnets"
+  puts "Endless Waffle AMI"
 	puts "Usage example: #{$0} -a us-east-1c"
 	puts
 	puts "Options:"
-	puts "-m or --monochrome".ljust(30)          +"-> Show results in monochrome"
 	puts "-a or --availability_zone".ljust(30)   +"-> Specifiy Availability Aone"
-	puts "-v or --vpc_id".ljust(30)              +"-> Specifiy vpc_id"
-  puts "-s or --subnet_id".ljust(30)           +"-> Specify subnet_id"
+	puts "-n or --name".ljust(30)                +"-> Specifiy Name"
+  puts "-i or --instance_type".ljust(30)       +"-> Specify instance type"
+  puts "-b or --version".ljust(30)             +"-> Specify version"
+  puts "-r or --release".ljust(30)             +"-> Specify release"
+  puts "-q or --ami_id".ljust(30)              +"-> Specify amiid"
   puts "-j or --json".ljust(30)                +"-> Raw JSON output"
 	puts "-c or --cache ".ljust(30)              +"-> Update local Cache database with current AWS data"
   puts "-h or --help".ljust(30)                +"-> Show this help message."
@@ -50,10 +43,12 @@ def showHelp
 end
 
 parser = GetoptLong.new
-parser.set_options(["-m", "--monochrome", GetoptLong::NO_ARGUMENT],
-                   ["-a", "--availability_zone", GetoptLong::NO_ARGUMENT],
-                   ["-v", "--vpc_id", GetoptLong::NO_ARGUMENT],
-                   ["-s", "--subnet_id", GetoptLong::NO_ARGUMENT],
+parser.set_options(["-a", "--availability_zone", GetoptLong::NO_ARGUMENT],
+                   ["-n", "--name", GetoptLong::NO_ARGUMENT],
+                   ["-i", "--instance_type", GetoptLong::NO_ARGUMENT],
+                   ["-v", "--version", GetoptLong::NO_ARGUMENT],
+                   ["-r", "--release", GetoptLong::NO_ARGUMENT],
+                   ["-q", "--ami_id", GetoptLong::NO_ARGUMENT],
                    ["-j", "--json", GetoptLong::NO_ARGUMENT],
                    ["-c", "--cache", GetoptLong::NO_ARGUMENT],
                    ["-h", "--help", GetoptLong::NO_ARGUMENT]
@@ -67,14 +62,16 @@ begin
 			when "-h" || "--help"
 				showHelp
 				exit
-			when "-m" || "--monochrome"
-        String.disable_colorization = true
 			when "-a" || "--availability_zone"
 				query.store(:availability_zone,  ARGV[0])
-      when "-v" || "--vpc_id"
-        query.store(:vpc_id,  ARGV[0])
-      when "-s" || "--subnet_id"
-        query.store(:subnet_id,  ARGV[0])
+      when "-n" || "--name"
+        query.store(:name,  ARGV[0])
+      when "-i" || "--instance_type"
+        query.store(:instance_type,  ARGV[0])
+      when "-v" || "--version"
+        query.store(:version,  ARGV[0])
+      when "-q" || "--ami_id"
+        query.store(:ami_id,  ARGV[0])
       when "-j" || "--json"
         showJSON = true
 			when "-c" || "--cache"
@@ -88,24 +85,27 @@ end while 1
 
 def showTable(result)
   table_config = [
-     {:key=>:subnet_id, :size=>16, :title=>"Subnet Id"},
-     {:key=>:state, :size=>10, :title=>"State"},
-     {:key=>:vpc_id, :size=>14, :title=>"VPC"},
-     {:key=>:availability_zone, :size=>12, :title=>"Zone"},
-     {:key=>:cidr_block, :size=>16, :title=>"CIDR"},
-     {:key=>:map_public_ip_on_launch, :size=>7, :title=>"Public"},
-     {:key=>:available_ip_address_count, :size=>15, :title=>"Unallocated ips"}
+     {:key=>:name, :size=>9, :title=>"Name"},
+     {:key=>:version, :size=>10, :title=>"Version"},
+     {:key=>:release, :size=>10, :title=>"Release"},
+     {:key=>:availability_zone, :size=>17, :title=>"Zone"},
+     {:key=>:arch, :size=>7, :title=>"Arch"},
+     {:key=>:instance_type, :size=>18, :title=>"Instance Type"},
+     {:key=>:ami_id, :size=>10, :title=>"AMI"},
+     {:key=>:aki_id, :size=>10, :title=>"AKI"}
+
   ]
   ConsoleTable.define(table_config) do |table|
       result.each do |r|
         table << [
-          r["subnet_id"].colorize(:yellow),
-          r["state"],
-          r["vpc_id"],
+          r["name"],
+          r["version"],
+          r["release"],
           r["availability_zone"],
-          r["cidr_block"],
-          r["map_public_ip_on_launch"],
-          colorizeState(r["available_ip_address_count"])
+          r["arch"],
+          r["instance_type"],
+          r["ami_id"],
+          r["aki_id"]
         ]
       end
   end
@@ -117,10 +117,10 @@ end
 
 if updateCache == true
   puts "Running Cache Update:"
-  puts EndlessWaffleCLI.updateSubnets
+  puts EndlessWaffleCLI.updateAmi
 end
 
-result = EndlessWaffleCLI.querySubnets query
+result = EndlessWaffleCLI.queryAmi query
 
 if showJSON == false
   showTable result
