@@ -85,4 +85,70 @@ module EndlessWaffleCLI
     end
   end
 
+  def self.updateSecurityGroups
+    begin
+      result = RestClient.get "#{@@server}/securitygroups/update", :accept => :json, :Authorization => "Token token=\"#{@@token}\""
+      JSON.parse(result.body)
+    rescue => e
+      raise e
+    end
+  end
+
+  def self.querySecurityGroups(query={})
+    begin
+      result = RestClient.post "#{@@server}/securitygroups/show", { :query => query }.to_json, :content_type => :json, :accept => :json, :Authorization => "Token token=\"#{@@token}\""
+      JSON.parse(result.body)
+    rescue => e
+      raise e
+    end
+  end
+
+
+  def self.listRoles(query={})
+    begin
+      result = RestClient.post "#{@@server}/role/list", { :query => query }.to_json, :content_type => :json, :accept => :json, :Authorization => "Token token=\"#{@@token}\""
+      JSON.parse(result.body)
+    rescue => e
+      raise e
+    end
+  end
+
+  def self.showRole(name)
+    begin
+      result = RestClient.post "#{@@server}/role/show", { :name => name }.to_json, :content_type => :json, :accept => :json, :Authorization => "Token token=\"#{@@token}\""
+      JSON.parse(result.body)
+    rescue => e
+      raise e
+    end
+  end
+
+  def self.createRole(name)
+    query = {"name" => name}
+    begin
+      result = RestClient.post "#{@@server}/role/create", query.to_json, :content_type => :json, :accept => :json, :Authorization => "Token token=\"#{@@token}\""
+      JSON.parse(result.body)
+    rescue => e
+      raise e
+    end
+  end
+
+  def self.deleteRole(name)
+    query = {"name" => name}
+    begin
+      result = RestClient.post "#{@@server}/role/delete", query.to_json, :content_type => :json, :Authorization => "Token token=\"#{@@token}\""
+      JSON.parse(result.body)
+    rescue => e
+      raise e
+    end
+  end
+
+  def self.updateRole(data)
+    begin
+      result = RestClient.post "#{@@server}/role/update", data.to_json, :content_type => :json, :Authorization => "Token token=\"#{@@token}\""
+      JSON.parse(result.body)
+    rescue => e
+      raise e
+    end
+  end
+
 end

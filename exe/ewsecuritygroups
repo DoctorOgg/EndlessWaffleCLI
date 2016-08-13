@@ -1,0 +1,120 @@
+#!/usr/bin/env ruby
+
+require "bundler/setup"
+require "EndlessWaffleCLI"
+require 'json'
+require 'getoptlong'
+require 'console_table'
+
+query = {}
+updateCache = false
+showJSON = false
+
+if ENV['EndlessWaffleURL'].nil?
+  puts "EndlessWaffleCLI requires the 'EndlessWaffleURL' environment variable to be set."
+  exit 1
+else
+  EndlessWaffleCLI.setServer ENV['EndlessWaffleURL']
+end
+
+if ENV['EndlessWaffleToken'].nil?
+  puts "EndlessWaffleCLI requires the 'EndlessWaffleToken' environment variable to be set."
+  exit 1
+else
+  EndlessWaffleCLI.setToken ENV['EndlessWaffleToken']
+end
+
+def colorizeState(state)
+  if state > 0
+    state.to_s.colorize(:green)
+  else
+    state.to_s.colorize(:red)
+  end
+end
+
+def showHelp
+  puts
+  puts "Endless Waffle Security Groups"
+	puts "Usage example: #{$0} -a us-east-1c"
+	puts
+	puts "Options:"
+	puts "-v or --vpc_id".ljust(30)              +"-> Specifiy vpc_id"
+  puts "-g or --group_id".ljust(30)            +"-> Specify group id"
+  puts "-n or --name".ljust(30)                +"-> Specify group id"
+  puts "-j or --json".ljust(30)                +"-> Raw JSON output"
+	puts "-c or --cache ".ljust(30)              +"-> Update local Cache database with current AWS data"
+  puts "-h or --help".ljust(30)                +"-> Show this help message."
+	puts
+end
+
+parser = GetoptLong.new
+parser.set_options(["-v", "--vpc_id", GetoptLong::NO_ARGUMENT],
+                   ["-g", "--group_id", GetoptLong::NO_ARGUMENT],
+                   ["-n", "--name", GetoptLong::NO_ARGUMENT],
+                   ["-j", "--json", GetoptLong::NO_ARGUMENT],
+                   ["-c", "--cache", GetoptLong::NO_ARGUMENT],
+                   ["-h", "--help", GetoptLong::NO_ARGUMENT]
+                   )
+
+begin
+	begin
+		opt,arg = parser.get_option
+		break if not opt
+		case opt
+			when "-h" || "--help"
+				showHelp
+				exit
+      when "-v" || "--vpc_id"
+        query.store(:vpc_id,  ARGV[0])
+      when "-g" || "--group_id"
+        query.store(:group_id,  ARGV[0])
+      when "-n" || "--name"
+        query.store(:name,  ARGV[0])
+      when "-j" || "--json"
+        showJSON = true
+			when "-c" || "--cache"
+				updateCache = true
+			end
+		rescue => err
+			puts "#{err.class()}: #{err.message}"
+			exit 1
+	end
+end while 1
+
+def showTable(result)
+  table_config = [
+     {:key=>:name, :size=>20, :title=>"Name"},
+     {:key=>:description, :size=>35, :title=>"Desc"},
+     {:key=>:group_id, :size=>12, :title=>"Group ID"},
+     {:key=>:vpc_id, :size=>12, :title=>"VPC ID"},
+     {:key=>:owner_id, :size=>16, :title=>"Owner"}
+  ]
+  ConsoleTable.define(table_config) do |table|
+      result.each do |r|
+        table << [
+          r["name"],
+          r["description"],
+          r["group_id"],
+          r["vpc_id"],
+          r["owner_id"]
+        ]
+      end
+  end
+end
+
+def showJSON(result)
+  puts JSON.pretty_generate(result)
+end
+
+if updateCache == true
+  puts "Running Cache Update:"
+  puts EndlessWaffleCLI.updateSecurityGroups
+end
+
+result = EndlessWaffleCLI.querySecurityGroups query
+
+if showJSON == false
+  showTable result
+else
+  showJSON result
+end
