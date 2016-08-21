@@ -1,0 +1,125 @@
+#!/usr/bin/env ruby
+
+require "bundler/setup"
+require "EndlessWaffleCLI"
+require 'json'
+require 'getoptlong'
+require 'console_table'
+require 'colorize'
+
+if ENV['EndlessWaffleURL'].nil?
+  puts "EndlessWaffleCLI requires the 'EndlessWaffleURL' environment variable to be set."
+  exit 1
+else
+  EndlessWaffleCLI.setServer ENV['EndlessWaffleURL']
+end
+
+if ENV['EndlessWaffleToken'].nil?
+  puts "EndlessWaffleCLI requires the 'EndlessWaffleToken' environment variable to be set."
+  exit 1
+else
+  EndlessWaffleCLI.setToken ENV['EndlessWaffleToken']
+end
+
+def showHelp
+  puts
+  puts "Endless Waffle Commands"
+	puts "Usage example: #{$0} -c MyNewCommand"
+	puts
+	puts "Options:"
+	puts "-c or --create".ljust(30)              +"-> Create new command"
+  puts "-l or --list".ljust(30)                +"-> List commands"
+  puts "-d or --delete".ljust(30)              +"-> Delete command"
+  puts "-e or --edit ".ljust(30)               +"-> Edit command"
+  puts "-s or --show ".ljust(30)               +"-> Show command"
+  puts "-h or --help".ljust(30)                +"-> Show this help message."
+	puts
+end
+
+def showCommand(name)
+  result = EndlessWaffleCLI.showCommand name
+  puts result["command"]
+end
+
+def createCommand(name)
+  puts JSON.pretty_generate(EndlessWaffleCLI.createCommand name)
+end
+
+def deleteCommand(name)
+  print "Are you Sure you want to delete Command #{name}  (y/n): ".colorize(:red)
+  response = STDIN.gets.chomp
+  if response == 'y'
+    puts EndlessWaffleCLI.deleteCommand(name)
+  else
+    puts "Stopping request."
+  end
+end
+
+def editCommand(name)
+  orignial = EndlessWaffleCLI.showCommand name
+  tmp_file="/tmp/ewCommand-edit-#{name}-#{$$}.sh"
+  File.open(tmp_file,"w") do |f|
+    f.write(orignial["command"])
+  end
+  if ENV['EDITOR'].nil?
+    puts "I can not continue, please set your EDITOR enviroment variable"
+    exit 1
+  end
+  system "$EDITOR #{tmp_file}"
+  edited = File.read(tmp_file)
+  FileUtils.rm tmp_file
+  result = {:name => name, :command => edited}
+  puts EndlessWaffleCLI.updateCommand result
+end
+
+def listCommand(name)
+  query = {"query"=>{"name"=>name}}
+  result = EndlessWaffleCLI.listCommand query
+  table_config = [
+     {:key=>:name, :size=>23, :title=>"Name"},
+     {:key=>:created_at, :size=>30, :title=>"Created"},
+     {:key=>:updated_at, :size=>30, :title=>"Updated"}
+  ]
+  ConsoleTable.define(table_config) do |table|
+      result.each do |r|
+        table << [
+          r["name"],
+          r["created_at"],
+          r["updated_at"]
+        ]
+      end
+  end
+end
+
+parser = GetoptLong.new
+parser.set_options(["-c", "--create", GetoptLong::NO_ARGUMENT],
+                   ["-l", "--list", GetoptLong::NO_ARGUMENT],
+                   ["-d", "--delete", GetoptLong::NO_ARGUMENT],
+                   ["-e", "--edit", GetoptLong::NO_ARGUMENT],
+                   ["-s", "--show", GetoptLong::NO_ARGUMENT],
+                   ["-h", "--help", GetoptLong::NO_ARGUMENT]
+                   )
+
+begin
+	begin
+		opt,arg = parser.get_option
+		break if not opt
+		case opt
+			when "-h" || "--help"
+				showHelp; exit
+      when "-c" || "--create"
+        createCommand  ARGV[0]; exit
+      when "-l" || "--list"
+        listCommand ARGV[0]; exit
+      when "-d" || "--delete"
+        deleteCommand  ARGV[0]; exit
+      when "-e" || "--edit"
+        editCommand ARGV[0]; exit
+			when "-s" || "--show"
+				showCommand ARGV[0]; exit
+			end
+		rescue => err
+			puts "#{err.class()}: #{err.message}"
+			exit 1
+	end
+end while 1

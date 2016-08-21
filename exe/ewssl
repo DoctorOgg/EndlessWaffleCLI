@@ -10,7 +10,7 @@ require 'console_table'
 require 'openssl'
 
 
-
+@upload_to_iam=false
 @results_directory = "#{ENV["HOME"]}/.ewssl"
 @config_file = "#{ENV["HOME"]}/.ewssl.json"
 
@@ -50,6 +50,7 @@ def display_help
 	puts "-c or --config".ljust(30) 		  +"-> Specifiy Config to use"
 	puts "-f or --fqdn".ljust(30) 		    +"-> Domain name you want a CRT for"
 	puts "-l or --list".ljust(30)         + "-> List Valid Configs"
+  puts "-i or --iam".ljust(30)         + "-> Upload Certificate to IAM"
 	puts
 	exit 1
 end
@@ -63,7 +64,8 @@ def parse_cli
   parser.set_options(["-h", "--help", GetoptLong::NO_ARGUMENT],
                      ["-c", "--config", GetoptLong::NO_ARGUMENT],
                      ["-f", "--fqdn", GetoptLong::NO_ARGUMENT],
-                     ["-l", "--list", GetoptLong::NO_ARGUMENT]
+                     ["-l", "--list", GetoptLong::NO_ARGUMENT],
+                     ["-i", "--iam", GetoptLong::NO_ARGUMENT]
                      )
 
   begin
@@ -78,6 +80,8 @@ def parse_cli
               @active_config = ARGV[0].strip().downcase()
            when "-f" || "--fqdn"
               @fqdn = ARGV[0].strip().downcase()
+          when "-i" || "--iam"
+             @upload_to_iam = true
             when "-l" || "--list"
               @list = true
   	    end
@@ -186,6 +190,14 @@ def genDataBag
   end
 end
 
+def upload_to_iam
+  command = "aws iam upload-server-certificate \
+            --server-certificate-name #{@fqdn.gsub('*','star')}-#{@timestamp} \
+            --certificate-body file://#{@my_cert_path} \
+            --private-key file://#{@my_key_path}\
+            --certificate-chain file://#{@my_chain_path}"
+  system(command)
+end
 
 parse_cli
 if @list == true
@@ -207,4 +219,8 @@ else
   storeSignedCert
   storeCertificateChain
   genDataBag
+  if @upload_to_iam == true
+    upload_to_iam
+  end
+
 end

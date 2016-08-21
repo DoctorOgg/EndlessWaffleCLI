@@ -151,4 +151,51 @@ module EndlessWaffleCLI
     end
   end
 
+  def self.listCommand(query={})
+    begin
+      result = RestClient.post "#{@@server}/commands/list", { :query => query }.to_json, :content_type => :json, :accept => :json, :Authorization => "Token token=\"#{@@token}\""
+      JSON.parse(result.body)
+    rescue => e
+      raise e
+    end
+  end
+
+  def self.showCommand(name)
+    begin
+      result = RestClient.post "#{@@server}/commands/show", { :name => name }.to_json, :content_type => :json, :accept => :json, :Authorization => "Token token=\"#{@@token}\""
+      JSON.parse(result.body)
+    rescue => e
+      raise e
+    end
+  end
+
+  def self.createCommand(name)
+    query = {"name" => name}
+    begin
+      result = RestClient.post "#{@@server}/commands/create", query.to_json, :content_type => :json, :accept => :json, :Authorization => "Token token=\"#{@@token}\""
+      JSON.parse(result.body)
+    rescue => e
+      raise e
+    end
+  end
+
+  def self.deleteCommand(name)
+    query = {"name" => name}
+    begin
+      result = RestClient.post "#{@@server}/commands/delete", query.to_json, :content_type => :json, :Authorization => "Token token=\"#{@@token}\""
+      JSON.parse(result.body)
+    rescue => e
+      raise e
+    end
+  end
+
+  def self.updateCommand(data)
+    begin
+      result = RestClient.post "#{@@server}/commands/update", data.to_json, :content_type => :json, :Authorization => "Token token=\"#{@@token}\""
+      JSON.parse(result.body)
+    rescue => e
+      raise e
+    end
+  end
+
 end

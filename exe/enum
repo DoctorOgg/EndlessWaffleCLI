@@ -101,7 +101,7 @@ def showTable(result)
      {:key=>:instanceId, :size=>13, :title=>"Instance Id"},
      {:key=>:name, :size=>13, :title=>"Name"},
      {:key=>:role, :size=>8, :title=>"Role"},
-     {:key=>:environment, :size=>8, :title=>"Env"},
+     {:key=>:environment, :size=>14, :title=>"Env"},
      {:key=>:instanceType, :size=>10, :title=>"Type"},
      {:key=>:availabilityZone, :size=>12, :title=>"Zone"},
      {:key=>:instanceState, :size=>12, :title=>"State"},
