@@ -198,4 +198,31 @@ module EndlessWaffleCLI
     end
   end
 
+  def self.ec2provisionShowjobs
+    begin
+      result = RestClient.post "#{@@server}/ec2provision/showjobs", {}.to_json, :content_type => :json, :Authorization => "Token token=\"#{@@token}\""
+      JSON.parse(result.body)
+    rescue => e
+      raise e
+    end
+  end
+
+  def self.ec2provisionShowLog(uuid)
+    begin
+      result = RestClient.post "#{@@server}/ec2provision/show", {:uuid=>uuid}.to_json, :content_type => :json, :Authorization => "Token token=\"#{@@token}\""
+      JSON.parse(result.body)
+    rescue => e
+      raise e
+    end
+  end
+
+  def self.ec2provisionBuild(az,role,env)
+    begin
+      result = RestClient.post "#{@@server}/ec2provision/build", {:environment => env, :availability_zone => az, :role => role}.to_json, :content_type => :json, :Authorization => "Token token=\"#{@@token}\""
+      JSON.parse(result.body)
+    rescue => e
+      raise e
+    end
+  end
+
 end

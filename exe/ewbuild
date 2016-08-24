@@ -1,0 +1,172 @@
+#!/usr/bin/env ruby
+
+require "bundler/setup"
+require "EndlessWaffleCLI"
+require 'json'
+require 'getoptlong'
+require 'console_table'
+require 'colorize'
+require 'eventmachine'
+require 'em-http'
+require 'date'
+
+
+build_config = {}
+list = false
+@watch = ""
+show_logs_uuid = nil
+
+if ENV['EndlessWaffleURL'].nil?
+  puts "EndlessWaffleCLI requires the 'EndlessWaffleURL' environment variable to be set."
+  exit 1
+else
+  EndlessWaffleCLI.setServer ENV['EndlessWaffleURL']
+end
+
+if ENV['EndlessWaffleToken'].nil?
+  puts "EndlessWaffleCLI requires the 'EndlessWaffleToken' environment variable to be set."
+  exit 1
+else
+  EndlessWaffleCLI.setToken ENV['EndlessWaffleToken']
+end
+
+def colorizeState(state)
+  if state == "running"
+    state.to_s.colorize(:light_green)
+  elsif state == "queued"
+    state.to_s.colorize(:light_yellow)
+  else
+    state.to_s.colorize(:light_cyan)
+  end
+end
+
+def showHelp
+  puts
+  puts "Endless Waffle EC2 Build Tool"
+	puts "Usage example: #{$0} -e dev1 -r frontend"
+	puts
+	puts "Options:"
+	puts "-e or --environment".ljust(30)         +"-> Specifiy environment"
+	puts "-r or --role".ljust(30)                +"-> Specifiy role"
+  puts "-z or --availability_zone".ljust(30)    +"-> Specifiy Availability Zone"
+  puts "-l or --list".ljust(30)                +"-> List Jobs"
+  puts "-w or --watch".ljust(30)               +"-> watch running job"
+  puts "-s or --show_logs".ljust(30)           +"-> Find by instanceId"
+  puts "-h or --help".ljust(30)                +"-> Show this help message."
+	puts
+end
+
+parser = GetoptLong.new
+parser.set_options(["-e", "--environment", GetoptLong::NO_ARGUMENT],
+                   ["-r", "--role", GetoptLong::NO_ARGUMENT],
+                   ["-z", "--availability_zone", GetoptLong::NO_ARGUMENT],
+                   ["-l", "--list", GetoptLong::NO_ARGUMENT],
+                   ["-w", "--watch", GetoptLong::NO_ARGUMENT],
+                   ["-s", "--show_logs", GetoptLong::NO_ARGUMENT],
+                   ["-h", "--help", GetoptLong::NO_ARGUMENT]
+                   )
+
+begin
+	begin
+		opt,arg = parser.get_option
+		break if not opt
+		case opt
+			when "-h" || "--help"
+				showHelp
+				exit
+			when "-e" || "--environment"
+        build_config.store(:environment, ARGV[0])
+			when "-r" || "--role"
+        build_config.store(:role, ARGV[0])
+      when "-z" || "--availability_zone"
+        build_config.store(:availability_zone, ARGV[0])
+      when "-l" || "--list"
+        list = true
+      when "-w" || "--watch"
+        @watch = ARGV[0].nil? ? "LIVE" : ARGV[0]
+      when "-s" || "--show_logs"
+        show_logs_uuid = ARGV[0]
+			end
+		rescue => err
+			puts "#{err.class()}: #{err.message}"
+			exit 1
+	end
+end while 1
+
+
+def listJobs
+  result = EndlessWaffleCLI.ec2provisionShowjobs
+  table_config = [
+     {:key=>:uuid, :size=>37, :title=>"UUID"},
+     {:key=>:name, :size=>10, :title=>"Name"},
+     {:key=>:role, :size=>10, :title=>"Role"},
+     {:key=>:environment, :size=>7, :title=>"Env"},
+     {:key=>:status, :size=>10, :title=>"Status"},
+     {:key=>:created_at, :size=>30, :title=>"Created"}
+  ]
+  ConsoleTable.define(table_config) do |table|
+      result["result"].each do |r|
+        formated_date = DateTime.parse(r["created_at"]).strftime('%b %e, %Y %H:%M:%S %z')
+        table << [
+          r["uuid"].colorize(:magenta),
+          r["name"],
+          r["role"],
+          r["environment"],
+          colorizeState(r["status"]),
+          formated_date]
+      end
+  end
+end
+
+def showLogs uuid
+  result = EndlessWaffleCLI.ec2provisionShowLog uuid
+  result["result"].each do |l|
+    puts l["log"]
+  end
+end
+
+def watchLive uuid
+  http = EM::HttpRequest.new("#{ENV['EndlessWaffleURL']}/ec2provision/watchjob/#{uuid}", :keepalive => true, :connect_timeout => 0, :inactivity_timeout => 0)
+  EventMachine.run do
+    s = http.get
+    s.stream do |data|
+      EventMachine.stop if data == "EOF"
+      puts data
+    end
+  end
+end
+
+
+
+def build(az,role,env)
+  puts az,role,env
+  result = EndlessWaffleCLI.ec2provisionBuild(az,role,env)
+  if result.key? "errors"
+    result["errors"].each do |e|
+      puts "ERROR: #{e}".colorize(:light_red)
+    end
+    exit 1
+  end
+  if result.key? "error"
+    puts "ERROR: #{result["error"]}".colorize(:light_red)
+    exit 1
+  end
+  if @watch == "LIVE"
+    watchLive result["uuid"]
+  end
+
+  puts JSON.pretty_generate(result)
+
+end
+
+if list == true
+  listJobs
+elsif !show_logs_uuid.nil?
+  showLogs show_logs_uuid
+elsif !build_config.empty?
+  if build_config.key? :availability_zone and  build_config.key? :role and  build_config.key? :environment
+    build(build_config[:availability_zone],build_config[:role],build_config[:environment])
+  else
+    puts "ERROR: Please specify all 3, availability_zone, role, and environment"
+  end
+end

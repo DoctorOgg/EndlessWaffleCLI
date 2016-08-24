@@ -41,4 +41,6 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'net-ssh-gateway', '~> 1.2'
   spec.add_dependency 'net-ssh', '~> 3.2'
   spec.add_dependency 'highline', '~> 1.7', '>= 1.7.8'
+  spec.add_dependency 'eventmachine', '~> 1.2', '>= 1.2.0.1'
+  spec.add_dependency 'em-http-request', '~> 1.1', '>= 1.1.5'
 end
