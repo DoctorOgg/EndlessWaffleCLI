@@ -225,4 +225,13 @@ module EndlessWaffleCLI
     end
   end
 
+  def self.ec2terminate(instanceId)
+    begin
+      result = RestClient.post "#{@@server}/ec2terminate/terminate", {:instanceId => instanceId}.to_json, :content_type => :json, :Authorization => "Token token=\"#{@@token}\""
+      JSON.parse(result.body)
+    rescue => e
+      raise e
+    end
+  end
+
 end
